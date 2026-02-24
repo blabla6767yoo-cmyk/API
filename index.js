@@ -4,16 +4,19 @@ const { randomUUID } = require("crypto");
 
 const app = express();
 
-// الربط المباشر لخدمة Railway
+// استخدام الربط المباشر مع تجاوز كل تعقيدات الـ SSL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: false // هذا السطر هو مفتاح الحل الحين!
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 async function startServer() {
   try {
+    // محاولة الاتصال
     await pool.connect();
-    console.log("✅ العداد شغال وقاعدة البيانات متصلة!");
+    console.log("✅ العداد متصل وقاعدة البيانات شغالة!");
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS active_sessions (
@@ -24,13 +27,18 @@ async function startServer() {
     `);
 
     app.get("/count", async (req, res) => {
-      const r = await pool.query("SELECT COUNT(*) FROM active_sessions WHERE last_seen > $1", [Date.now() - 5000]);
-      res.json({ online: Number(r.rows[0].count) });
+      try {
+        const r = await pool.query("SELECT COUNT(*) FROM active_sessions WHERE last_seen > $1", [Date.now() - 5000]);
+        res.json({ online: Number(r.rows[0].count) });
+      } catch {
+        res.json({ online: 0 });
+      }
     });
 
     app.get("/join", async (req, res) => {
       const sessionId = randomUUID();
-      await pool.query("INSERT INTO active_sessions VALUES($1,$2,$3)", [sessionId, req.query.player, Date.now()]);
+      const playerId = req.query.player || "unknown";
+      await pool.query("INSERT INTO active_sessions VALUES($1,$2,$3)", [sessionId, playerId, Date.now()]);
       res.json({ session: sessionId });
     });
 
@@ -39,11 +47,19 @@ async function startServer() {
       res.send("alive");
     });
 
-    app.get("/", (req, res) => res.send("Counter is Online! 🚀"));
+    app.get("/", (req, res) => res.send("Counter is Ready! 🚀"));
 
-    app.listen(process.env.PORT || 3000);
+    // لازم نحدد المنفذ صح عشان Railway يشوفه
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server on port ${PORT}`);
+    });
+
   } catch (err) {
-    console.error("❌ خطأ في الربط:", err.message);
+    console.error("❌ DB Error:", err.message);
+    // حتى لو فشل الاتصال، خل السيرفر يشتغل عشان ما يعطيك "Failed to respond"
+    app.get("/", (req, res) => res.send("DB Connecting..."));
+    app.listen(process.env.PORT || 3000);
   }
 }
 
