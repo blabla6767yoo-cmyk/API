@@ -44,22 +44,26 @@ async function startServer() {
     } catch { res.sendStatus(500); }
   });
 
-  app.get("/get_status_77", async (req, res) => {
+  app.get("/aWFtZG93bmdvZ29nYWdh", async (req, res) => {
     try {
       const r = await pool.query("SELECT COUNT(*) FROM active_sessions");
-      res.json({ active: Number(r.rows[0].count) });
-    } catch { res.json({ active: 0 }); }
+      res.json({ status: "success", data: { online: Number(r.rows[0].count) } });
+    } catch {
+      res.json({ online: 0 });
+    }
+  });
+
+  app.get("/iamdowngogogaga", (req, res) => {
+    res.status(403).send("Error 403: Unauthorized Access. Security protocol 0x99 triggered.");
+  });
+
+  app.get("/-38jwbiLl", (req, res) => {
+    res.status(401).send("Nice try."); 
   });
 
   app.get("/count", (req, res) => {
-    res.status(403).send("Nice try! This path is disabled for security reasons.");
+    res.status(403).send("Forbidden.");
   });
-
-  app.get("/ping", (req, res) => {
-    res.status(404).send("Not Found");
-  });
-
-  app.get("/check_00", (req, res) => res.send("active_1"));
 
   const PORT = process.env.PORT || 3000;
   app.listen(PORT);
